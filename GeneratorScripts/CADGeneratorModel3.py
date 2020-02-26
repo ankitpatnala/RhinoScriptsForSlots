@@ -23,6 +23,13 @@ def AddBrepBox(point1, point2):
     rc = Rhino.Commands.Result.Failure
     return brep
     
+def AddCylinder(centerPoint,orientation,radius,height):
+    plane = Rhino.Geometry.Plane(centerPoint, orientation)
+    circle = Rhino.Geometry.Circle(plane, radius)
+    cylinder = Rhino.Geometry.Cylinder(circle, height)
+    brep = cylinder.ToBrep(True, True)
+    return brep
+    
 def GenerateSlotsForSteppedModel():
     point1 = Rhino.Geometry.Point3d(10 + random.random()*5,
     10 + random.random()*5,
@@ -40,7 +47,25 @@ def GenerateSlotsForSteppedModel():
     leftMargin = 3
     filled = False
     height  = 2 + random.random()*2
-                
+    randomEdge = random.randint(0,3)
+    filletRadius = 2+ 2*random.random()
+    if(randomEdge == 0):
+        filletBrepBox = AddBrepBox(Rhino.Geometry.Point3d(0,0,0),Rhino.Geometry.Point3d(filletRadius,filletRadius,point1.Z))
+        filletCylinder = AddCylinder(Rhino.Geometry.Point3d(filletRadius,filletRadius,0),Rhino.Geometry.Vector3d(0,0,1),filletRadius,point1.Z)
+        brepFillet = Rhino.Geometry.Brep.CreateBooleanDifference(filletBrepBox,filletCylinder,tolerance)[0]
+    elif(randomEdge == 1):
+        filletBrepBox = AddBrepBox(Rhino.Geometry.Point3d(point2.X - filletRadius,0,0),Rhino.Geometry.Point3d(point2.X,filletRadius,point2.Z))
+        filletCylinder = AddCylinder(Rhino.Geometry.Point3d(point2.X - filletRadius,filletRadius,0),Rhino.Geometry.Vector3d(0,0,1),filletRadius,point2.Z)
+        brepFillet = Rhino.Geometry.Brep.CreateBooleanDifference(filletBrepBox,filletCylinder,tolerance)[0]
+    elif(randomEdge == 2):
+        filletBrepBox = AddBrepBox(Rhino.Geometry.Point3d(point2.X - filletRadius,point2.Y - filletRadius ,0),Rhino.Geometry.Point3d(point2.X,point2.Y,point2.Z))
+        filletCylinder = AddCylinder(Rhino.Geometry.Point3d(point2.X - filletRadius,point2.Y - filletRadius ,0),Rhino.Geometry.Vector3d(0,0,1),filletRadius,point2.Z)
+        brepFillet = Rhino.Geometry.Brep.CreateBooleanDifference(filletBrepBox,filletCylinder,tolerance)[0]
+    else:
+        filletBrepBox = AddBrepBox(Rhino.Geometry.Point3d(0,point1.Y - filletRadius ,0),Rhino.Geometry.Point3d(filletRadius,point1.Y,point1.Z))
+        filletCylinder = AddCylinder(Rhino.Geometry.Point3d(filletRadius,point1.Y - filletRadius ,0),Rhino.Geometry.Vector3d(0,0,1),filletRadius,point1.Z)
+        brepFillet = Rhino.Geometry.Brep.CreateBooleanDifference(filletBrepBox,filletCylinder,tolerance)[0]
+    
     if(orientationIdx == 0):
         lowerBlock = bool(random.randint(0,1))
         if(straight):
@@ -85,10 +110,7 @@ def GenerateSlotsForSteppedModel():
                 brepToSubtract = AddBrepBox(bottomDiagonal,upperDiagonal)
                 brepArrayToCheck = [brepBox1,brepToSubtract]
                 brepUnion = Rhino.Geometry.Brep.CreateBooleanUnion(brepArrayToCheck,tolerance)
-                if(brepUnion is not None):
-                    brepTotalVolume = brepUnion[0].GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume + brepBox2.GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume
-                else:
-                    brepTotalVolume = 100000
+                brepTotalVolume = brepUnion[0].GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume + brepBox2.GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume
             sqrDist = SquareDistanceBetweenTwoPoints(
             Rhino.Geometry.Point3d(leftPointX,leftPointY,0),
             Rhino.Geometry.Point3d(rightPointX,rightPointY,0))
@@ -116,7 +138,10 @@ def GenerateSlotsForSteppedModel():
                 brepToSubtract = Rhino.Geometry.Box(plane,points).ToBrep()
                 brepArrayToCheck = [brepBox1,brepToSubtract]
                 brepUnion = Rhino.Geometry.Brep.CreateBooleanUnion(brepArrayToCheck,tolerance)
-                brepTotalVolume = brepUnion[0].GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume + brepBox2.GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume
+                if(brepUnion is not None):
+                    brepTotalVolume = brepUnion[0].GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume + brepBox2.GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume
+                else :
+                    brepTotalVolume = 1000000
             else:
                 leftPointX = leftMargin + point1.X + random.random()*(point2.X - leftMargin - point1.X)
                 leftPointY = leftMargin + random.random()*(point2.Y - leftMargin)
@@ -184,7 +209,11 @@ def GenerateSlotsForSteppedModel():
             plane  = Rhino.Geometry.Plane(points[0],points[3],points[4])
             brepToSubtract = Rhino.Geometry.Box(plane,points).ToBrep()
             brepUnion = Rhino.Geometry.Brep.CreateBooleanUnion(brepArray,tolerance)
-            brepTotalVolume = Rhino.Geometry.Brep.CreateBooleanUnion([brepUnion[0],brepToSubtract],tolerance)[0].GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume
+            brepVolume = Rhino.Geometry.Brep.CreateBooleanUnion([brepUnion[0],brepToSubtract],tolerance)
+            if(brepVolume is not None):
+                brepTotalVolume = brepVolume[0].GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume
+            else :
+                brepTotalVolume = 100000
             if(brepTotalVolume == brepUnion[0].GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume and brepUnion is not None):
                 brepTotalVolume = brepBox1.GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume + brepBox2.GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume
             else:
@@ -539,13 +568,13 @@ def GenerateSlotsForSteppedModel():
                 brepArrayToCheck = [brepBox2,brepToSubtract]
                 brepUnion = Rhino.Geometry.Brep.CreateBooleanUnion(brepArrayToCheck,tolerance)
                 brepTotalVolume = brepUnion[0].GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume + brepBox1.GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume
-    brepSubtractArray = [brepToSubtract]
-    
+    brepSubtractArray = [brepToSubtract,brepFillet]
+    check,curves,points = Rhino.Geometry.Intersect.Intersection.BrepBrep(brepToSubtract,brepFillet,tolerance)
     brepBoxUnion = Rhino.Geometry.Brep.CreateBooleanUnion(brepArray,tolerance)
     brepAddArray = [brepBoxUnion[0]]
     brepModel = Rhino.Geometry.Brep.CreateBooleanDifference(brepAddArray,brepSubtractArray,tolerance)
     totalVolume = brepBox1.GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume + brepBox2.GetBoundingBox(Rhino.Geometry.Vector3d(0,0,1)).Volume
-    if ( brepModel is not None and width > 4 and sqrDist > 16 and brepTotalVolume <= totalVolume):
+    if ( brepModel is not None and width > 4 and sqrDist > 16 and brepTotalVolume <= totalVolume and curves is None):
         for brep in brepModel:
             if(scriptcontext.doc.Objects.AddBrep(brep) != System.Guid.Empty ):           
                 scriptcontext.doc.Views.Redraw()
